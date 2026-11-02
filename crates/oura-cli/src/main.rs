@@ -172,8 +172,7 @@ fn load_key(path: &Option<PathBuf>) -> Result<Option<[u8; 16]>> {
 /// Generate a random 16-byte auth key from the OS CSPRNG.
 fn generate_key() -> Result<[u8; 16]> {
     let mut key = [0u8; 16];
-    getrandom::fill(&mut key)
-        .map_err(|e| anyhow!("generating random auth key: {e}"))?;
+    getrandom::fill(&mut key).map_err(|e| anyhow!("generating random auth key: {e}"))?;
     Ok(key)
 }
 
@@ -574,13 +573,10 @@ async fn cmd_factory_reset(cli: &Cli, key: &Option<[u8; 16]>, yes: bool) -> Resu
         client.authenticate(k).await.context("authenticating")?;
     }
     println!("Factory-resetting ring {serial} ...");
-    let frames = oura_link::transport::transact(
-        client.transport(),
-        &[0x1a, 0x00],
-        Duration::from_secs(3),
-    )
-    .await
-    .context("sending factory reset")?;
+    let frames =
+        oura_link::transport::transact(client.transport(), &[0x1a, 0x00], Duration::from_secs(3))
+            .await
+            .context("sending factory reset")?;
     for f in &frames {
         println!("  <- {}", hex::encode(f));
     }
@@ -617,7 +613,9 @@ async fn cmd_sync(cli: &Cli, key: &Option<[u8; 16]>, sync_time: bool) -> Result<
         if let Err(e) = client.sync_time_app().await {
             tracing::debug!("app-style time sync failed ({e}); trying the legacy form");
             if let Err(e) = client.sync_time().await {
-                eprintln!("warning: could not align the ring clock ({e}); recent nights may stay undated");
+                eprintln!(
+                    "warning: could not align the ring clock ({e}); recent nights may stay undated"
+                );
             }
         }
     }

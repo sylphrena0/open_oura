@@ -594,7 +594,10 @@ impl<T: Transport> OuraClient<T> {
                 tail_passes = 0;
             }
             if bytes_left == 0 {
-                tracing::debug!(cursor = start, "ring reports drained; confirming with one more pass");
+                tracing::debug!(
+                    cursor = start,
+                    "ring reports drained; confirming with one more pass"
+                );
             }
         }
         Ok(SyncOutcome {
@@ -997,7 +1000,10 @@ mod tests {
             &["2f09430600aa430364bbcc2f0a42010000000000000000"],
         );
         // the confirming pass at cursor 2 comes back empty
-        mock.on("2f0c4100c8000000000000000010", &["2f0a42000000000000000000"]);
+        mock.on(
+            "2f0c4100c8000000000000000010",
+            &["2f0a42000000000000000000"],
+        );
         let client = OuraClient::new(mock).with_quiet(Duration::from_millis(20));
         let outcome = client.drain_events(0, |_| true, |_| true).await.unwrap();
         assert_eq!(outcome.events_synced, 1);
@@ -1049,11 +1055,26 @@ mod tests {
         mock.on("280100", &["290100"]);
         mock.on("2f0c410000000000000000000010", &["2f020041"]);
         // cursor 0 → event at t=1; cursor 2 → t=2; cursor 3 → t=3; cursor 4 → t=4 …
-        mock.on("100900000000ffffffffff", &["430801000000746573741106000000000000"]);
-        mock.on("100902000000ffffffffff", &["430802000000746573741106000000000000"]);
-        mock.on("100903000000ffffffffff", &["430803000000746573741106000000000000"]);
-        mock.on("100904000000ffffffffff", &["430804000000746573741106000000000000"]);
-        mock.on("100905000000ffffffffff", &["430805000000746573741106000000000000"]);
+        mock.on(
+            "100900000000ffffffffff",
+            &["430801000000746573741106000000000000"],
+        );
+        mock.on(
+            "100902000000ffffffffff",
+            &["430802000000746573741106000000000000"],
+        );
+        mock.on(
+            "100903000000ffffffffff",
+            &["430803000000746573741106000000000000"],
+        );
+        mock.on(
+            "100904000000ffffffffff",
+            &["430804000000746573741106000000000000"],
+        );
+        mock.on(
+            "100905000000ffffffffff",
+            &["430805000000746573741106000000000000"],
+        );
         let client = OuraClient::new(mock).with_quiet(Duration::from_millis(20));
         let outcome = client.drain_events(0, |_| true, |_| true).await.unwrap();
         assert_eq!(outcome.events_synced, MAX_TAIL_PASSES);
