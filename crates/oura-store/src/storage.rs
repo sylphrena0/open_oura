@@ -497,8 +497,7 @@ impl Store {
                 )?;
                 for (id, tag, existing_name, body, existing_decoded) in batch {
                     let tag_u8 = u8::try_from(tag).unwrap_or(0);
-                    let decoded =
-                        decode_stored_event(tag_u8, &body, existing_decoded.as_deref());
+                    let decoded = decode_stored_event(tag_u8, &body, existing_decoded.as_deref());
                     if decoded.is_some() {
                         decoded_count += 1;
                     }
@@ -628,7 +627,10 @@ mod tests {
         pending.timestamp = 43;
         writer.insert_event("S1", &pending).unwrap();
 
-        Store::open_read_only(&src).unwrap().export_to(&dst).unwrap();
+        Store::open_read_only(&src)
+            .unwrap()
+            .export_to(&dst)
+            .unwrap();
         writer.conn.execute_batch("COMMIT").unwrap();
 
         let copy = Store::open_read_only(&dst).unwrap();
@@ -637,7 +639,10 @@ mod tests {
             .conn
             .query_row("SELECT COUNT(*) FROM events", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(rows, 1, "the copy holds what was committed, not the open batch");
+        assert_eq!(
+            rows, 1,
+            "the copy holds what was committed, not the open batch"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -807,13 +812,41 @@ mod tests {
 
         // Simulate a legacy DB before `decode_ring_start` and `store_meta` existed.
         let raw_samples: &[(i64, &[u8], i64)] = &[
-            (20_715, &hex_bytes("040000003A020103010001020100"), 1_780_000_001),
-            (7_307_868, &hex_bytes("0400000038020103010001020100"), 1_780_000_002),
-            (21_989_329, &hex_bytes("0400000038020103010001020100"), 1_780_000_003),
-            (30_662_842, &hex_bytes("0400000038020103010001020100"), 1_780_000_004),
-            (34_445_201, &hex_bytes("0400000038020114010001020100"), 1_780_000_005),
-            (40_127_511, &hex_bytes("0130000038020114010001020100"), 1_780_000_006),
-            (49_912_254, &hex_bytes("0400000038020114010001020100"), 1_780_000_007),
+            (
+                20_715,
+                &hex_bytes("040000003A020103010001020100"),
+                1_780_000_001,
+            ),
+            (
+                7_307_868,
+                &hex_bytes("0400000038020103010001020100"),
+                1_780_000_002,
+            ),
+            (
+                21_989_329,
+                &hex_bytes("0400000038020103010001020100"),
+                1_780_000_003,
+            ),
+            (
+                30_662_842,
+                &hex_bytes("0400000038020103010001020100"),
+                1_780_000_004,
+            ),
+            (
+                34_445_201,
+                &hex_bytes("0400000038020114010001020100"),
+                1_780_000_005,
+            ),
+            (
+                40_127_511,
+                &hex_bytes("0130000038020114010001020100"),
+                1_780_000_006,
+            ),
+            (
+                49_912_254,
+                &hex_bytes("0400000038020114010001020100"),
+                1_780_000_007,
+            ),
         ];
         {
             let conn = Connection::open(&path).unwrap();
@@ -839,7 +872,9 @@ mod tests {
         assert_eq!(ro.event_totals().unwrap(), (7, 0));
         let pre_events = ro.decoded_events().unwrap();
         assert_eq!(pre_events.len(), 7);
-        assert!(pre_events.iter().all(|(_, tag, json, _)| *tag == 0x41 && json.contains("firmware_version")));
+        assert!(pre_events
+            .iter()
+            .all(|(_, tag, json, _)| *tag == 0x41 && json.contains("firmware_version")));
         drop(ro);
 
         // Opening writable runs the versioned migration once and populates `decoded_json`.
@@ -938,15 +973,22 @@ mod tests {
         assert!(store.redecode_batched(2).is_err());
 
         // Batch 1 (rows 1..=2) and Batch 2 (rows 3..=4) committed; checkpoint is at id = 4.
-        assert_eq!(store.get_meta("redecode_cursor_id").unwrap().as_deref(), Some("4"));
+        assert_eq!(
+            store.get_meta("redecode_cursor_id").unwrap().as_deref(),
+            Some("4")
+        );
         // Row 2 was decoded in batch 1; row 5 is still NULL because batch 3 rolled back.
         let row2_json: Option<String> = store
             .conn
-            .query_row("SELECT decoded_json FROM events WHERE id = 2", [], |r| r.get(0))
+            .query_row("SELECT decoded_json FROM events WHERE id = 2", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         let row5_json: Option<String> = store
             .conn
-            .query_row("SELECT decoded_json FROM events WHERE id = 5", [], |r| r.get(0))
+            .query_row("SELECT decoded_json FROM events WHERE id = 5", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert!(row2_json.unwrap().contains("2.1.20"));
         assert!(row5_json.is_none());
@@ -969,7 +1011,9 @@ mod tests {
         // Verify phone anchor kept `source="phone"` and unsupported row 3 kept its valid JSON.
         let row1_json: String = store
             .conn
-            .query_row("SELECT decoded_json FROM events WHERE id = 1", [], |r| r.get(0))
+            .query_row("SELECT decoded_json FROM events WHERE id = 1", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         let row1_val: serde_json::Value = serde_json::from_str(&row1_json).unwrap();
         assert_eq!(row1_val["unix_time"].as_u64(), Some(1_787_733_221));
@@ -977,7 +1021,9 @@ mod tests {
 
         let row3_json: String = store
             .conn
-            .query_row("SELECT decoded_json FROM events WHERE id = 3", [], |r| r.get(0))
+            .query_row("SELECT decoded_json FROM events WHERE id = 3", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(row3_json, "{\"preserved\":true}");
         assert_eq!(store.event_totals().unwrap(), (5, 4));
