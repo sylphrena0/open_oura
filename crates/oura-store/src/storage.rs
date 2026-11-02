@@ -595,6 +595,27 @@ impl Store {
         Ok(rows)
     }
 
+    /// Raw `(ring_timestamp, tag, body, captured_unix)` of `tags`, in capture order.
+    #[allow(clippy::type_complexity)]
+    pub fn raw_events_with_tags(&self, tags: &[u8]) -> Result<Vec<(i64, u8, Vec<u8>, i64)>> {
+        let tag_list = tags.iter().map(u8::to_string).collect::<Vec<_>>().join(",");
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT ring_timestamp, tag, body, captured_unix FROM events \
+             WHERE tag IN ({tag_list}) ORDER BY captured_unix, id"
+        ))?;
+        let rows = stmt
+            .query_map([], |r| {
+                Ok((
+                    r.get::<_, i64>(0)?,
+                    r.get::<_, i64>(1)? as u8,
+                    r.get::<_, Vec<u8>>(2)?,
+                    r.get::<_, i64>(3)?,
+                ))
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
     /// Count `(raw_events, decoded_events)` across the store.
     pub fn event_totals(&self) -> Result<(usize, usize)> {
         let (raw, decoded): (i64, i64) = self.conn.query_row(
@@ -840,6 +861,28 @@ mod tests {
             .map(|row| row.0)
             .collect();
         assert_eq!(timestamps, [5_000_000, 10]);
+    }
+
+    #[test]
+    fn raw_events_with_tags_filters_by_tag() {
+        let store = Store::open_in_memory().unwrap();
+        for (tag, timestamp) in [(0x42, 10), (0x46, 20), (0x43, 30)] {
+            let event = RingEvent {
+                tag,
+                name: "x",
+                timestamp,
+                body: vec![tag],
+                decoded: None,
+            };
+            store.insert_event("S1", &event).unwrap();
+        }
+        let tags: Vec<u8> = store
+            .raw_events_with_tags(&[0x42, 0x43])
+            .unwrap()
+            .into_iter()
+            .map(|row| row.1)
+            .collect();
+        assert_eq!(tags, [0x42, 0x43]);
     }
 
     #[test]
