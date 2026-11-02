@@ -367,16 +367,15 @@ impl<T: Transport> OuraClient<T> {
         Ok(())
     }
 
-    /// Align the ring clock using the official-app `12 09` counter form observed
-    /// on Ring 4/5. Prefer this for app-parity setup; `sync_time` keeps the older
-    /// `u64 unix + timezone` shape used by earlier probes.
+    /// Align the ring clock to exact unix seconds and the local UTC offset, as Oura
+    /// does. `sync_time` sends the same packet with a zero offset.
     pub async fn sync_time_app(&self) -> Result<()> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        let token = (now as u8).wrapping_mul(37).wrapping_add(0xa5);
-        self.request(&protocol::req_sync_time_counter(now, token))
+        let utc_offset_half_hours = local_utc_offset_half_hours() as u8;
+        self.request_tag(&protocol::req_sync_time(now, utc_offset_half_hours), 0x13)
             .await?;
         Ok(())
     }
@@ -922,6 +921,27 @@ fn parse_live_hr_frame(frame: &[u8]) -> Option<HeartRateSample> {
         return None;
     }
     bpm_from_ibi(ibi_ms).map(|bpm| HeartRateSample { bpm, ibi_ms })
+}
+
+/// The local offset from UTC in signed half hours (0 where unknown).
+fn local_utc_offset_half_hours() -> i8 {
+    #[cfg(unix)]
+    {
+        // SAFETY: `localtime_r` only writes into the zeroed `local_time` we pass.
+        let offset = unsafe {
+            let now = libc::time(std::ptr::null_mut());
+            let mut local_time: libc::tm = std::mem::zeroed();
+            if libc::localtime_r(&now, &mut local_time).is_null() {
+                return 0;
+            }
+            local_time.tm_gmtoff as i64
+        };
+        (offset / 1800).clamp(i8::MIN as i64, i8::MAX as i64) as i8
+    }
+    #[cfg(not(unix))]
+    {
+        0
+    }
 }
 
 #[cfg(test)]

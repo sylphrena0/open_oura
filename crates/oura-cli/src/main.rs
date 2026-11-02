@@ -607,9 +607,8 @@ async fn cmd_sync(cli: &Cli, key: &Option<[u8; 16]>, sync_time: bool) -> Result<
         .context("running app-style stream setup")?;
 
     if sync_time {
-        // Same order as the iOS app: the official-app counter form, then the older
-        // unix+timezone form. The anchor event this writes is what dates the history;
-        // a failure is worth a warning, not a failed sync.
+        // Local-zone sync, then the UTC form. The anchor event this writes is what
+        // dates the history; a failure is worth a warning, not a failed sync.
         if let Err(e) = client.sync_time_app().await {
             tracing::debug!("app-style time sync failed ({e}); trying the legacy form");
             if let Err(e) = client.sync_time().await {
