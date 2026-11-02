@@ -1,7 +1,7 @@
 //! Nightly skin temperature + deviation. Ported from
 //! `nightly_temperature_calculate @ 0x203520`: a 7-sample sliding median, then
 //! 30-sample windows; each window contributes its max when its range < 2.50 °C,
-//! and the nightly value is the **minimum of those window maxima** (needs >= 4
+//! and the nightly value is the **second-highest of those window maxima** (needs >= 4
 //! valid windows). Units: ring temperature is i16 centi-°C (value/100 = °C).
 //! See `docs/algorithms/temperature.md`.
 
@@ -42,7 +42,8 @@ pub fn nightly_temperature(samples: &[u16]) -> Option<i16> {
     if maxima.len() < MIN_WINDOWS {
         return None;
     }
-    maxima.into_iter().min().map(|v| v as i16)
+    maxima.sort_unstable_by(|a, b| b.cmp(a));
+    Some(maxima[1] as i16)
 }
 
 /// Temperature deviation (centi-°C) = nightly temperature − personal baseline mean.
@@ -66,5 +67,14 @@ mod tests {
         // 60 samples -> 2 windows, 50 -> 1 window; both < 4 required -> None
         assert_eq!(nightly_temperature(&[3500u16; 60]), None);
         assert_eq!(nightly_temperature(&[3500u16; 50]), None);
+    }
+
+    #[test]
+    fn second_highest_window_max() {
+        let samples: Vec<u16> = [3356u16, 3372, 3374, 3387]
+            .iter()
+            .flat_map(|&m| std::iter::repeat_n(m, 30))
+            .collect();
+        assert_eq!(nightly_temperature(&samples), Some(3374));
     }
 }
